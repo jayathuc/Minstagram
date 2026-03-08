@@ -65,8 +65,6 @@ dependencies {
     ksp(libs.hilt.compiler)
     implementation(libs.hilt.navigation.compose)
 
-    // WebKit (dark mode control for WebView)
-    implementation(libs.webkit)
 
     // Room
     implementation(libs.room.runtime)
