@@ -60,6 +60,9 @@ fun BrowserScreen(
     viewModel: BrowserViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    // Collected separately so only SessionBanner recomposes every second,
+    // not the entire screen including the WebView container.
+    val elapsedSeconds by viewModel.elapsedSeconds.collectAsState()
     var showExitDialog by remember { mutableStateOf(false) }
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
 
@@ -74,7 +77,7 @@ fun BrowserScreen(
     if (showExitDialog) {
         SessionExitDialog(
             intention = intention,
-            elapsedSeconds = uiState.elapsedSeconds,
+            elapsedSeconds = elapsedSeconds,
             onStay = { showExitDialog = false },
             onFinish = onSessionEnd
         )
@@ -83,7 +86,7 @@ fun BrowserScreen(
     Column(modifier = Modifier.fillMaxSize()) {
         SessionBanner(
             intention = intention,
-            elapsedSeconds = uiState.elapsedSeconds,
+            elapsedSeconds = elapsedSeconds,
             onExit = { showExitDialog = true }
         )
 
@@ -172,6 +175,9 @@ fun BrowserScreen(
                             loadWithOverviewMode = true
                             useWideViewPort = true
                             setSupportMultipleWindows(true)
+                            // Keep default (true): videos require a tap to play.
+                            // Setting this to false caused all feed videos to autoplay
+                            // simultaneously while scrolling, saturating the hardware decoder.
                         }
 
                         // Prevent black screen on dark-mode devices:

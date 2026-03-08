@@ -6,7 +6,6 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import com.jayathu.minstagram.util.JavaScriptInjector
 
 class MinstagramWebViewClient(
     private val onPageStarted: () -> Unit = {},
@@ -21,15 +20,6 @@ class MinstagramWebViewClient(
 
     override fun onPageFinished(view: WebView?, url: String?) {
         super.onPageFinished(view, url)
-        // Only inject distraction-blocking scripts on authenticated feed pages.
-        // Skip auth pages entirely so login/2FA/challenge flows are not interfered with.
-        if (!isAuthPage(url)) {
-            view?.let {
-                it.evaluateJavascript(JavaScriptInjector.HIDE_DISTRACTIONS, null)
-                it.evaluateJavascript(JavaScriptInjector.DISABLE_AUTOPLAY, null)
-                it.evaluateJavascript(JavaScriptInjector.BLOCK_EXPLORE_NAVIGATION, null)
-            }
-        }
         onPageLoaded()
     }
 
@@ -77,13 +67,4 @@ class MinstagramWebViewClient(
         return false
     }
 
-    private fun isAuthPage(url: String?): Boolean {
-        if (url == null) return true
-        return url.contains("/accounts/") ||
-            url.contains("accounts.instagram.com") ||
-            url.contains("/login") ||
-            url.contains("/signup") ||
-            url.contains("/challenge/") ||
-            url.contains("/two_factor")
-    }
 }

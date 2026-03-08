@@ -11,9 +11,10 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+// Excludes elapsedSeconds — kept in a separate StateFlow so the timer tick
+// does not recompose the WebView container, only the SessionBanner.
 data class BrowserUiState(
     val isLoading: Boolean = true,
-    val elapsedSeconds: Int = 0,
     val errorMessage: String? = null
 )
 
@@ -23,18 +24,16 @@ class BrowserViewModel @Inject constructor() : ViewModel() {
     private val _uiState = MutableStateFlow(BrowserUiState())
     val uiState: StateFlow<BrowserUiState> = _uiState.asStateFlow()
 
+    private val _elapsedSeconds = MutableStateFlow(0)
+    val elapsedSeconds: StateFlow<Int> = _elapsedSeconds.asStateFlow()
+
     private val startTimeMs = System.currentTimeMillis()
 
     init {
-        startTimer()
-    }
-
-    private fun startTimer() {
         viewModelScope.launch {
             while (true) {
                 delay(1000L)
-                val elapsed = ((System.currentTimeMillis() - startTimeMs) / 1000).toInt()
-                _uiState.update { it.copy(elapsedSeconds = elapsed) }
+                _elapsedSeconds.value = ((System.currentTimeMillis() - startTimeMs) / 1000).toInt()
             }
         }
     }
