@@ -5,42 +5,25 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import com.jayathu.minstagram.presentation.navigation.MinstagramNavHost
-import com.jayathu.minstagram.receiver.EndSessionReceiver
-import com.jayathu.minstagram.service.SessionService
+import com.jayathu.minstagram.service.UsageMonitorService
 import com.jayathu.minstagram.ui.theme.MinstagramTheme
+import com.jayathu.minstagram.util.hasUsageAccess
 import dagger.hilt.android.AndroidEntryPoint
 
+// Screen changes (summary, intercepted gate) are driven by prefs checked on
+// resume, not intent extras. Android drops extras when it just brings an
+// existing task forward, so extras were unreliable here.
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
-    companion object {
-        const val EXTRA_SHOW_SUMMARY = "extra_show_summary"
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (hasUsageAccess(this)) {
+            startForegroundService(Intent(this, UsageMonitorService::class.java))
+        }
         setContent {
             MinstagramTheme {
-                MinstagramNavHost(
-                    startOnSummary = intent?.getBooleanExtra(EXTRA_SHOW_SUMMARY, false) == true,
-                    summaryIntention = intent?.getStringExtra(SessionService.EXTRA_INTENTION),
-                    summaryDuration = intent?.getIntExtra(EndSessionReceiver.EXTRA_DURATION_SECONDS, 0) ?: 0
-                )
-            }
-        }
-    }
-
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        if (intent.getBooleanExtra(EXTRA_SHOW_SUMMARY, false)) {
-            setContent {
-                MinstagramTheme {
-                    MinstagramNavHost(
-                        startOnSummary = true,
-                        summaryIntention = intent.getStringExtra(SessionService.EXTRA_INTENTION),
-                        summaryDuration = intent.getIntExtra(EndSessionReceiver.EXTRA_DURATION_SECONDS, 0)
-                    )
-                }
+                MinstagramNavHost()
             }
         }
     }

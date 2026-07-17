@@ -14,7 +14,14 @@ class IntentViewModel @Inject constructor() : ViewModel() {
     var selectedIntention by mutableStateOf<SessionIntention?>(null)
         private set
 
+    var selectedTimeLimitMinutes by mutableStateOf(5)
+        private set
+
     fun selectIntention(intention: SessionIntention) {
         selectedIntention = intention
+    }
+
+    fun selectTimeLimit(minutes: Int) {
+        selectedTimeLimitMinutes = minutes
     }
 }

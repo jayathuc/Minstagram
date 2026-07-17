@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.jayathu.minstagram.domain.model.SessionIntention
+import com.jayathu.minstagram.util.formatDuration
 
 @Composable
 fun SessionSummaryScreen(
@@ -60,10 +61,4 @@ fun SessionSummaryScreen(
             }
         }
     }
-}
-
-private fun formatDuration(seconds: Int): String {
-    val minutes = seconds / 60
-    val secs = seconds % 60
-    return if (minutes > 0) "${minutes}m ${secs}s" else "${secs}s"
 }
