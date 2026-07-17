@@ -63,7 +63,8 @@ fun SessionSummaryScreen(
             Spacer(modifier = Modifier.height(24.dp))
             Text(
                 text = latest?.let {
-                    "You used ${formatDuration(it.actualSeconds)} of your ${it.plannedSeconds / 60}m plan"
+                    val reels = if (it.reelsWatched > 0) "  ·  ${it.reelsWatched} reels" else ""
+                    "You used ${formatDuration(it.actualSeconds)} of your ${it.plannedSeconds / 60}m plan$reels"
                 } ?: "Time spent: ${formatDuration(durationSeconds)}",
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

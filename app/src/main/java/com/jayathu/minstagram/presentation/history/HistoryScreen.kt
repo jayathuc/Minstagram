@@ -134,6 +134,7 @@ private fun SessionRow(session: SessionEntity) {
                 Text(
                     text = "${formatDuration(session.actualSeconds)} of ${session.plannedSeconds / 60}m" +
                         "  ·  ${reason.label}" +
+                        (if (session.reelsWatched > 0) "  ·  ${session.reelsWatched} reels" else "") +
                         if (session.wasIntercepted) "  ·  caught" else "",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant

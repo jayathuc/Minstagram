@@ -56,6 +56,18 @@
                 android:value="Background monitoring to intercept direct Instagram launches for mindful usage" />
         </service>
 
+        <service
+            android:name=".service.ReelWatcherService"
+            android:exported="false"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/reel_watcher_config" />
+        </service>
+
         <receiver
             android:name=".receiver.BootReceiver"
             android:exported="false">

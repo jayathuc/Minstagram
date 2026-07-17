@@ -146,6 +146,7 @@ class SessionService : Service() {
             .putInt(Prefs.SESSION_ACCUMULATED_SECONDS, accumulatedSeconds)
             .putLong(Prefs.SESSION_STARTED_AT_MS, startedAtMs)
             .putBoolean(Prefs.SESSION_WAS_INTERCEPTED, wasIntercepted)
+            .putInt(Prefs.REELS_THIS_SESSION, 0)
             .apply()
 
         expired = false
@@ -248,7 +249,8 @@ class SessionService : Service() {
             startedAtMs = startedAtMs,
             endedAtMs = System.currentTimeMillis(),
             wasIntercepted = wasIntercepted,
-            endReason = reason.name
+            endReason = reason.name,
+            reelsWatched = Prefs.get(this).getInt(Prefs.REELS_THIS_SESSION, 0)
         )
         scope.launch { sessionDao.insert(session) }
     }

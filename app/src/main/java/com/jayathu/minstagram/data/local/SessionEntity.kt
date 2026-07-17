@@ -12,5 +12,6 @@ data class SessionEntity(
     val startedAtMs: Long,
     val endedAtMs: Long,
     val wasIntercepted: Boolean,
-    val endReason: String
+    val endReason: String,
+    val reelsWatched: Int = 0
 )

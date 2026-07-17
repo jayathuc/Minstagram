@@ -16,6 +16,9 @@ object Prefs {
     const val SESSION_STARTED_AT_MS = "session_started_at_ms"
     const val SESSION_WAS_INTERCEPTED = "session_was_intercepted"
 
+    // bumped by the reel watcher while a session runs
+    const val REELS_THIS_SESSION = "reels_this_session"
+
     // set when a session ends while the user is in another app,
     // shown next time they open Minstagram
     const val PENDING_SUMMARY_INTENTION = "pending_summary_intention"

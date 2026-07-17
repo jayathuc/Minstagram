@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Minstagram</string>
+    <string name="reel_watcher_description">Counts Reels inside Instagram and asks a quick question between them, so watching stays a conscious choice. Works only inside Instagram and reads nothing else.</string>
 </resources>

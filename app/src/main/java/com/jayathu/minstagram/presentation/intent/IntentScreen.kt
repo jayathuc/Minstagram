@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.jayathu.minstagram.data.Prefs
 import com.jayathu.minstagram.domain.model.SessionIntention
+import com.jayathu.minstagram.util.isReelWatcherEnabled
 
 data class SessionConfig(
     val intention: SessionIntention,
@@ -114,6 +115,38 @@ fun IntentScreen(
                     onClick = { viewModel.selectIntention(intention) }
                 )
                 Spacer(modifier = Modifier.height(10.dp))
+            }
+
+            val hintContext = LocalContext.current
+            if (selected == SessionIntention.WATCH_REELS && !isReelWatcherEnabled(hintContext)) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "Reel questions are off",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "Enable Minstagram in Accessibility settings to get a reel counter and a small question between Reels.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        TextButton(onClick = {
+                            hintContext.startActivity(
+                                android.content.Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                            )
+                        }) {
+                            Text("Open Accessibility settings")
+                        }
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))

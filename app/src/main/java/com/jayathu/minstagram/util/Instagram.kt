@@ -3,6 +3,7 @@ package com.jayathu.minstagram.util
 import android.app.AppOpsManager
 import android.content.Context
 import android.os.Process
+import android.provider.Settings
 import android.widget.Toast
 
 const val INSTAGRAM_PACKAGE = "com.instagram.android"
@@ -24,4 +25,12 @@ fun hasUsageAccess(context: Context): Boolean {
         context.packageName
     )
     return mode == AppOpsManager.MODE_ALLOWED
+}
+
+fun isReelWatcherEnabled(context: Context): Boolean {
+    val enabled = Settings.Secure.getString(
+        context.contentResolver,
+        Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+    ) ?: return false
+    return enabled.contains(context.packageName) && enabled.contains("ReelWatcherService")
 }
