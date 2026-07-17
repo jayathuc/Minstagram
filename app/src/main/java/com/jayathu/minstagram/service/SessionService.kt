@@ -22,24 +22,41 @@ import androidx.core.app.NotificationCompat
 import com.jayathu.minstagram.MainActivity
 import com.jayathu.minstagram.R
 import com.jayathu.minstagram.data.Prefs
+import com.jayathu.minstagram.data.local.SessionDao
+import com.jayathu.minstagram.data.local.SessionEntity
+import com.jayathu.minstagram.domain.model.EndReason
 import com.jayathu.minstagram.domain.model.SessionIntention
-import com.jayathu.minstagram.receiver.EndSessionReceiver
 import com.jayathu.minstagram.util.ForegroundAppDetector
 import com.jayathu.minstagram.util.INSTAGRAM_PACKAGE
 import com.jayathu.minstagram.util.formatDuration
 import com.jayathu.minstagram.util.hasUsageAccess
+import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import javax.inject.Inject
 
+@AndroidEntryPoint
 class SessionService : Service() {
 
     companion object {
+        const val ACTION_END_EARLY = "com.jayathu.minstagram.ACTION_END_EARLY"
         const val EXTRA_INTENTION = "extra_intention"
         const val EXTRA_TIME_LIMIT_SECONDS = "extra_time_limit_seconds"
+        const val EXTRA_WAS_INTERCEPTED = "extra_was_intercepted"
         const val CHANNEL_ID = "session_channel"
         const val NOTIFICATION_ID = 1
 
         // leave Instagram this long and the session ends on its own
         private const val ABANDON_AFTER_SECONDS = 60
     }
+
+    @Inject
+    lateinit var sessionDao: SessionDao
+
+    // not cancelled in onDestroy so a final insert can finish
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val handler = Handler(Looper.getMainLooper())
     private var detector: ForegroundAppDetector? = null
@@ -50,6 +67,9 @@ class SessionService : Service() {
     private var backgroundedSeconds = 0
     private var counting = false
     private var expired = false
+    private var startedAtMs = 0L
+    private var wasIntercepted = false
+    private var recorded = false
 
     private var overlayView: TextView? = null
     private var expiryOverlay: View? = null
@@ -62,7 +82,7 @@ class SessionService : Service() {
             if (expired) {
                 // expiry overlay is up; if they leave Instagram we're done
                 if (!inInstagram) {
-                    endSessionQuietly()
+                    endSessionQuietly(EndReason.COMPLETED)
                     return
                 }
             } else if (inInstagram) {
@@ -80,7 +100,7 @@ class SessionService : Service() {
                 if (counting) pauseCounting()
                 backgroundedSeconds++
                 if (backgroundedSeconds >= ABANDON_AFTER_SECONDS) {
-                    endSessionQuietly()
+                    endSessionQuietly(EndReason.WALKED_AWAY)
                     return
                 }
             }
@@ -97,19 +117,24 @@ class SessionService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val prefs = Prefs.get(this)
 
+        if (intent?.action == ACTION_END_EARLY) {
+            // "End Session" button on the notification
+            if (restoreFromPrefs()) {
+                endSession(EndReason.ENDED_EARLY)
+            } else {
+                stopSelf()
+            }
+            return START_NOT_STICKY
+        }
+
         if (intent != null) {
             val intentionName = intent.getStringExtra(EXTRA_INTENTION) ?: SessionIntention.JUST_BROWSING.name
             intention = SessionIntention.valueOf(intentionName)
             timeLimitSeconds = intent.getIntExtra(EXTRA_TIME_LIMIT_SECONDS, 300)
             accumulatedSeconds = 0
-        } else if (prefs.getBoolean(Prefs.SESSION_ACTIVE, false)) {
-            // the system restarted us mid-session, pick up where we left off
-            intention = SessionIntention.valueOf(
-                prefs.getString(Prefs.SESSION_INTENTION, null) ?: SessionIntention.JUST_BROWSING.name
-            )
-            timeLimitSeconds = prefs.getInt(Prefs.SESSION_LIMIT_SECONDS, 300)
-            accumulatedSeconds = prefs.getInt(Prefs.SESSION_ACCUMULATED_SECONDS, 0)
-        } else {
+            startedAtMs = System.currentTimeMillis()
+            wasIntercepted = intent.getBooleanExtra(EXTRA_WAS_INTERCEPTED, false)
+        } else if (!restoreFromPrefs()) {
             stopSelf()
             return START_NOT_STICKY
         }
@@ -119,9 +144,12 @@ class SessionService : Service() {
             .putString(Prefs.SESSION_INTENTION, intention.name)
             .putInt(Prefs.SESSION_LIMIT_SECONDS, timeLimitSeconds)
             .putInt(Prefs.SESSION_ACCUMULATED_SECONDS, accumulatedSeconds)
+            .putLong(Prefs.SESSION_STARTED_AT_MS, startedAtMs)
+            .putBoolean(Prefs.SESSION_WAS_INTERCEPTED, wasIntercepted)
             .apply()
 
         expired = false
+        recorded = false
         counting = true
         backgroundedSeconds = 0
         detector = if (hasUsageAccess(this)) ForegroundAppDetector(this) else null
@@ -131,6 +159,20 @@ class SessionService : Service() {
         handler.removeCallbacks(tick)
         handler.post(tick)
         return START_STICKY
+    }
+
+    // true if a live session was found in prefs
+    private fun restoreFromPrefs(): Boolean {
+        val prefs = Prefs.get(this)
+        if (!prefs.getBoolean(Prefs.SESSION_ACTIVE, false)) return false
+        intention = SessionIntention.valueOf(
+            prefs.getString(Prefs.SESSION_INTENTION, null) ?: SessionIntention.JUST_BROWSING.name
+        )
+        timeLimitSeconds = prefs.getInt(Prefs.SESSION_LIMIT_SECONDS, 300)
+        accumulatedSeconds = prefs.getInt(Prefs.SESSION_ACCUMULATED_SECONDS, 0)
+        startedAtMs = prefs.getLong(Prefs.SESSION_STARTED_AT_MS, System.currentTimeMillis())
+        wasIntercepted = prefs.getBoolean(Prefs.SESSION_WAS_INTERCEPTED, false)
+        return true
     }
 
     override fun onDestroy() {
@@ -171,14 +213,15 @@ class SessionService : Service() {
     private fun onTimerExpired() {
         notify(buildExpiredNotification())
         if (isAutoCloseEnabled()) {
-            endSession()
+            endSession(EndReason.COMPLETED)
         } else {
             showExpiryOverlay()
         }
     }
 
     // Normal end: bring the app forward, it shows the summary from prefs.
-    private fun endSession() {
+    private fun endSession(reason: EndReason) {
+        record(reason)
         savePendingSummary()
         val mainIntent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
@@ -189,9 +232,25 @@ class SessionService : Service() {
 
     // The user walked away from Instagram. Don't interrupt whatever they're
     // doing now, just save the summary for the next time they open the app.
-    private fun endSessionQuietly() {
+    private fun endSessionQuietly(reason: EndReason) {
+        record(reason)
         savePendingSummary()
         stopSelf()
+    }
+
+    private fun record(reason: EndReason) {
+        if (recorded) return
+        recorded = true
+        val session = SessionEntity(
+            intention = intention.name,
+            plannedSeconds = timeLimitSeconds,
+            actualSeconds = accumulatedSeconds,
+            startedAtMs = startedAtMs,
+            endedAtMs = System.currentTimeMillis(),
+            wasIntercepted = wasIntercepted,
+            endReason = reason.name
+        )
+        scope.launch { sessionDao.insert(session) }
     }
 
     private fun savePendingSummary() {
@@ -261,7 +320,7 @@ class SessionService : Service() {
 
     private fun showExpiryOverlay() {
         if (!Settings.canDrawOverlays(this)) {
-            endSession()
+            endSession(EndReason.COMPLETED)
             return
         }
 
@@ -295,7 +354,7 @@ class SessionService : Service() {
             text = "Exit Instagram"
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
             setPadding(dpToPx(32), dpToPx(12), dpToPx(32), dpToPx(12))
-            setOnClickListener { endSession() }
+            setOnClickListener { endSession(EndReason.COMPLETED) }
         }
         layout.addView(exitButton)
 
@@ -333,10 +392,10 @@ class SessionService : Service() {
     }
 
     private fun baseNotification(): NotificationCompat.Builder {
-        val endIntent = Intent(this, EndSessionReceiver::class.java).apply {
-            action = EndSessionReceiver.ACTION_END_SESSION
+        val endIntent = Intent(this, SessionService::class.java).apply {
+            action = ACTION_END_EARLY
         }
-        val endPendingIntent = PendingIntent.getBroadcast(
+        val endPendingIntent = PendingIntent.getService(
             this, 0, endIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )

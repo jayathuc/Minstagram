@@ -57,10 +57,6 @@
         </service>
 
         <receiver
-            android:name=".receiver.EndSessionReceiver"
-            android:exported="false" />
-
-        <receiver
             android:name=".receiver.BootReceiver"
             android:exported="false">
             <intent-filter>

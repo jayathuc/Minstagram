@@ -40,7 +40,8 @@ import com.jayathu.minstagram.domain.model.SessionIntention
 
 data class SessionConfig(
     val intention: SessionIntention,
-    val timeLimitMinutes: Int
+    val timeLimitMinutes: Int,
+    val intercepted: Boolean = false
 )
 
 @Composable
@@ -48,6 +49,7 @@ fun IntentScreen(
     onSessionStart: (SessionConfig) -> Unit,
     intercepted: Boolean = false,
     onSnooze: () -> Unit = {},
+    onShowHistory: () -> Unit = {},
     viewModel: IntentViewModel = hiltViewModel()
 ) {
     val selected = viewModel.selectedIntention
@@ -187,7 +189,7 @@ fun IntentScreen(
             Button(
                 onClick = {
                     selected?.let {
-                        onSessionStart(SessionConfig(it, timeLimit))
+                        onSessionStart(SessionConfig(it, timeLimit, intercepted))
                     }
                 },
                 enabled = selected != null,
@@ -209,7 +211,13 @@ fun IntentScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+
+            TextButton(onClick = onShowHistory) {
+                Text("View history")
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }

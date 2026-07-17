@@ -14,6 +14,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -28,6 +29,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.jayathu.minstagram.data.Prefs
 import com.jayathu.minstagram.domain.model.SessionIntention
+import com.jayathu.minstagram.presentation.history.HistoryScreen
 import com.jayathu.minstagram.presentation.intent.IntentScreen
 import com.jayathu.minstagram.presentation.intent.SessionConfig
 import com.jayathu.minstagram.presentation.summary.SessionSummaryScreen
@@ -50,8 +52,9 @@ fun MinstagramNavHost(
             // holds the session config so permission callbacks can resume the launch
             val pendingConfig = remember { mutableListOf<SessionConfig>() }
 
-            // true when the monitor caught a direct Instagram open
-            var intercepted by remember { mutableStateOf(false) }
+            // true when the monitor caught a direct Instagram open;
+            // saveable so it survives a detour to the history screen
+            var intercepted by rememberSaveable { mutableStateOf(false) }
             DisposableEffect(lifecycleOwner) {
                 val observer = LifecycleEventObserver { _, event ->
                     if (event == Lifecycle.Event.ON_RESUME) {
@@ -78,6 +81,7 @@ fun MinstagramNavHost(
                 val serviceIntent = Intent(context, SessionService::class.java).apply {
                     putExtra(SessionService.EXTRA_INTENTION, config.intention.name)
                     putExtra(SessionService.EXTRA_TIME_LIMIT_SECONDS, config.timeLimitMinutes * 60)
+                    putExtra(SessionService.EXTRA_WAS_INTERCEPTED, config.intercepted)
                 }
                 context.startForegroundService(serviceIntent)
                 startUsageMonitor()
@@ -128,6 +132,7 @@ fun MinstagramNavHost(
             IntentScreen(
                 intercepted = intercepted,
                 onSnooze = { snooze() },
+                onShowHistory = { navController.navigate("history") },
                 onSessionStart = { config ->
                     // 1. overlay permission for the session banner
                     if (!Settings.canDrawOverlays(context)) {
@@ -192,8 +197,12 @@ fun MinstagramNavHost(
                     navController.navigate("intent") {
                         popUpTo(0) { inclusive = true }
                     }
-                }
+                },
+                onShowHistory = { navController.navigate("history") }
             )
+        }
+        composable("history") {
+            HistoryScreen(onBack = { navController.popBackStack() })
         }
     }
 

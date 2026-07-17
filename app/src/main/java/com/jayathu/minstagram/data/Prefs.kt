@@ -13,6 +13,8 @@ object Prefs {
     const val SESSION_INTENTION = "session_intention"
     const val SESSION_LIMIT_SECONDS = "session_limit_seconds"
     const val SESSION_ACCUMULATED_SECONDS = "session_accumulated_seconds"
+    const val SESSION_STARTED_AT_MS = "session_started_at_ms"
+    const val SESSION_WAS_INTERCEPTED = "session_was_intercepted"
 
     // set when a session ends while the user is in another app,
     // shown next time they open Minstagram
@@ -37,6 +39,8 @@ object Prefs {
             .remove(SESSION_INTENTION)
             .remove(SESSION_LIMIT_SECONDS)
             .remove(SESSION_ACCUMULATED_SECONDS)
+            .remove(SESSION_STARTED_AT_MS)
+            .remove(SESSION_WAS_INTERCEPTED)
             .apply()
     }
 }
