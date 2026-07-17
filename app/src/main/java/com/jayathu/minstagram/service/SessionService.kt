@@ -50,6 +50,10 @@ class SessionService : Service() {
 
         // leave Instagram this long and the session ends on its own
         private const val ABANDON_AFTER_SECONDS = 60
+
+        // banner shows briefly, then stays up for the final stretch
+        private const val BANNER_FLASH_MS = 4000L
+        private const val BANNER_STICKY_LAST_SECONDS = 60
     }
 
     @Inject
@@ -74,6 +78,8 @@ class SessionService : Service() {
     private var overlayView: TextView? = null
     private var expiryOverlay: View? = null
     private var windowManager: WindowManager? = null
+
+    private val bannerHide = Runnable { overlayView?.visibility = View.GONE }
 
     private val tick = object : Runnable {
         override fun run() {
@@ -157,6 +163,7 @@ class SessionService : Service() {
 
         startForeground(NOTIFICATION_ID, buildCountingNotification())
         showOverlay()
+        flashBanner()
         handler.removeCallbacks(tick)
         handler.post(tick)
         return START_STICKY
@@ -199,14 +206,25 @@ class SessionService : Service() {
 
     private fun resumeCounting() {
         counting = true
-        overlayView?.visibility = View.VISIBLE
+        flashBanner()
         notify(buildCountingNotification())
     }
 
     private fun pauseCounting() {
         counting = false
+        handler.removeCallbacks(bannerHide)
         overlayView?.visibility = View.GONE
         notify(buildPausedNotification())
+    }
+
+    // Show the banner for a moment, then get out of the way. It stays up
+    // for the last minute so the ending isn't a surprise.
+    private fun flashBanner() {
+        overlayView?.visibility = View.VISIBLE
+        handler.removeCallbacks(bannerHide)
+        if (timeLimitSeconds - accumulatedSeconds > BANNER_STICKY_LAST_SECONDS) {
+            handler.postDelayed(bannerHide, BANNER_FLASH_MS)
+        }
     }
 
     // --- Timer expiry ---
@@ -309,6 +327,13 @@ class SessionService : Service() {
     private fun updateOverlay() {
         if (expired) return
         overlayView?.text = bannerText()
+        // keep it visible through the final minute
+        if (timeLimitSeconds - accumulatedSeconds <= BANNER_STICKY_LAST_SECONDS &&
+            overlayView?.visibility != View.VISIBLE
+        ) {
+            handler.removeCallbacks(bannerHide)
+            overlayView?.visibility = View.VISIBLE
+        }
     }
 
     private fun removeOverlay() {

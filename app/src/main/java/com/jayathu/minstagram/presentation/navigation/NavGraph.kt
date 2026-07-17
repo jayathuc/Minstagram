@@ -31,6 +31,7 @@ import com.jayathu.minstagram.data.Prefs
 import com.jayathu.minstagram.domain.model.SessionIntention
 import com.jayathu.minstagram.presentation.history.HistoryScreen
 import com.jayathu.minstagram.presentation.intent.IntentScreen
+import com.jayathu.minstagram.presentation.settings.SettingsScreen
 import com.jayathu.minstagram.presentation.intent.SessionConfig
 import com.jayathu.minstagram.presentation.summary.SessionSummaryScreen
 import com.jayathu.minstagram.service.SessionService
@@ -133,6 +134,7 @@ fun MinstagramNavHost(
                 intercepted = intercepted,
                 onSnooze = { snooze() },
                 onShowHistory = { navController.navigate("history") },
+                onShowSettings = { navController.navigate("settings") },
                 onSessionStart = { config ->
                     // 1. overlay permission for the session banner
                     if (!Settings.canDrawOverlays(context)) {
@@ -203,6 +205,9 @@ fun MinstagramNavHost(
         }
         composable("history") {
             HistoryScreen(onBack = { navController.popBackStack() })
+        }
+        composable("settings") {
+            SettingsScreen(onBack = { navController.popBackStack() })
         }
     }
 

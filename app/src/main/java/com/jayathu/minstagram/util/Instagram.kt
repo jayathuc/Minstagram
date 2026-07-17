@@ -1,6 +1,7 @@
 package com.jayathu.minstagram.util
 
 import android.app.AppOpsManager
+import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.os.Process
 import android.provider.Settings
@@ -25,6 +26,18 @@ fun hasUsageAccess(context: Context): Boolean {
         context.packageName
     )
     return mode == AppOpsManager.MODE_ALLOWED
+}
+
+// Real Instagram screen time from the system, sessions or not.
+fun instagramUsageMs(context: Context, sinceMs: Long): Long {
+    val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
+        ?: return 0L
+    val now = System.currentTimeMillis()
+    val stats = usm.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, sinceMs, now)
+        ?: return 0L
+    return stats
+        .filter { it.packageName == INSTAGRAM_PACKAGE && it.lastTimeUsed >= sinceMs }
+        .sumOf { it.totalTimeInForeground }
 }
 
 fun isReelWatcherEnabled(context: Context): Boolean {

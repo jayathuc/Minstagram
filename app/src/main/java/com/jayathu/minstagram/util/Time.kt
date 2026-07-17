@@ -18,3 +18,15 @@ fun startOfTodayMs(
 
 fun sevenDaysAgoMs(nowMs: Long = System.currentTimeMillis()): Long =
     nowMs - 7 * 24 * 60 * 60 * 1000L
+
+// coarse form for stats lines: "6h 12m", "47m", "under a minute"
+fun formatHoursMinutes(ms: Long): String {
+    val totalMinutes = ms / 60_000L
+    val hours = totalMinutes / 60
+    val minutes = totalMinutes % 60
+    return when {
+        hours > 0 -> "${hours}h ${minutes}m"
+        minutes > 0 -> "${minutes}m"
+        else -> "under a minute"
+    }
+}

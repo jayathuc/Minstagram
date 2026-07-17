@@ -19,6 +19,13 @@ object Prefs {
     // bumped by the reel watcher while a session runs
     const val REELS_THIS_SESSION = "reels_this_session"
 
+    // user settings for reel questions
+    const val REELS_PER_QUESTION = "reels_per_question"
+    const val QUIZ_CATEGORY = "quiz_category"
+
+    const val DEFAULT_REELS_PER_QUESTION = 3
+    const val DEFAULT_QUIZ_CATEGORY = "MIXED"
+
     // set when a session ends while the user is in another app,
     // shown next time they open Minstagram
     const val PENDING_SUMMARY_INTENTION = "pending_summary_intention"

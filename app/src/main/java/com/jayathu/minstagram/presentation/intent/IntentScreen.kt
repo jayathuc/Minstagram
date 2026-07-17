@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.jayathu.minstagram.data.Prefs
 import com.jayathu.minstagram.domain.model.SessionIntention
+import com.jayathu.minstagram.util.formatHoursMinutes
 import com.jayathu.minstagram.util.isReelWatcherEnabled
 
 data class SessionConfig(
@@ -51,6 +52,7 @@ fun IntentScreen(
     intercepted: Boolean = false,
     onSnooze: () -> Unit = {},
     onShowHistory: () -> Unit = {},
+    onShowSettings: () -> Unit = {},
     viewModel: IntentViewModel = hiltViewModel()
 ) {
     val selected = viewModel.selectedIntention
@@ -106,7 +108,38 @@ fun IntentScreen(
                 textAlign = TextAlign.Center
             )
 
-            Spacer(modifier = Modifier.height(28.dp))
+            if (viewModel.usageTodayMs >= 0) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "Instagram so far",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "Today: ${formatHoursMinutes(viewModel.usageTodayMs)}" +
+                                "   ·   Last 7 days: ${formatHoursMinutes(viewModel.usageWeekMs)}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
 
             SessionIntention.entries.forEach { intention ->
                 IntentionCard(
@@ -159,26 +192,34 @@ fun IntentScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                listOf(1, 5, 10, 15).forEach { minutes ->
-                    FilterChip(
-                        selected = timeLimit == minutes,
-                        onClick = { viewModel.selectTimeLimit(minutes) },
-                        label = {
-                            Text(
-                                text = "${minutes}m",
-                                style = MaterialTheme.typography.labelLarge
+            listOf(listOf(1, 5), listOf(10, 15)).forEach { rowMinutes ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    rowMinutes.forEach { minutes ->
+                        FilterChip(
+                            selected = timeLimit == minutes,
+                            onClick = { viewModel.selectTimeLimit(minutes) },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(48.dp),
+                            label = {
+                                Text(
+                                    text = if (minutes == 1) "1 minute" else "$minutes minutes",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    textAlign = TextAlign.Center
+                                )
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary
                             )
-                        },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = MaterialTheme.colorScheme.primary,
-                            selectedLabelColor = MaterialTheme.colorScheme.onPrimary
                         )
-                    )
+                    }
                 }
+                Spacer(modifier = Modifier.height(10.dp))
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -246,8 +287,17 @@ fun IntentScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            TextButton(onClick = onShowHistory) {
-                Text("View history")
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center
+            ) {
+                TextButton(onClick = onShowHistory) {
+                    Text("View history")
+                }
+                Spacer(modifier = Modifier.width(16.dp))
+                TextButton(onClick = onShowSettings) {
+                    Text("Settings")
+                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))

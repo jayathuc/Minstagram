@@ -4,6 +4,7 @@ import android.accessibilityservice.AccessibilityService
 import android.content.Context
 import android.graphics.PixelFormat
 import android.media.AudioManager
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -17,22 +18,25 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import com.jayathu.minstagram.data.Prefs
 import com.jayathu.minstagram.domain.QuizBank
+import com.jayathu.minstagram.domain.QuizCategory
 import com.jayathu.minstagram.domain.QuizQuestion
 import com.jayathu.minstagram.util.INSTAGRAM_PACKAGE
 
 // Watches Instagram's Reels surface. Counts how many Reels go by and
 // puts a small question between every few of them. The goal is to keep
 // watching a conscious act, not to punish it.
+//
+// Counting is anchored to the reels pager view itself: only scroll events
+// whose source is the pager count, and the pager's item index is used when
+// available. Story trays, the feed, comments and tab swipes scroll other
+// views, so they never count.
 class ReelWatcherService : AccessibilityService() {
 
     companion object {
-        private const val REELS_PER_QUESTION = 3
         private const val SCROLL_DEBOUNCE_MS = 700L
         private const val SURFACE_CHECK_THROTTLE_MS = 300L
-
-        // How long the badge lingers after the last time we saw the pager,
-        // so it doesn't flicker during reel transitions.
-        private const val BADGE_LINGER_MS = 5000L
+        private const val BADGE_SHOW_MS = 3000L
+        private const val OVERLAY_GUARD_INTERVAL_MS = 1000L
 
         // Only reset the count for a genuinely new sitting, never a flap.
         private const val NEW_SITTING_GAP_MS = 60_000L
@@ -51,6 +55,7 @@ class ReelWatcherService : AccessibilityService() {
     private var lastSurfaceCheckMs = 0L
     private var lastReelsSeenMs = 0L
     private var lastScrollMs = 0L
+    private var lastReelIndex = -1
     private var reelCount = 0
     private var reelsSinceQuiz = 0
 
@@ -63,11 +68,21 @@ class ReelWatcherService : AccessibilityService() {
     // media volume saved while a question is up, so the reel goes quiet
     private var savedMusicVolume = -1
 
-    // hides the badge if the pager hasn't been seen for a while
-    private val badgeHideCheck = Runnable {
-        if (SystemClock.uptimeMillis() - lastReelsSeenMs >= BADGE_LINGER_MS) {
-            inReels = false
-            removeBadge()
+    private val badgeHide = Runnable { removeBadge() }
+
+    // Our event filter only covers Instagram, so we never hear about the user
+    // going home or switching apps. While anything is on screen, poll the
+    // focused window and tear down the moment it isn't Instagram.
+    private val overlayGuard = object : Runnable {
+        override fun run() {
+            val pkg = rootInActiveWindow?.packageName?.toString()
+            if (pkg != null && pkg != INSTAGRAM_PACKAGE && pkg != packageName) {
+                leaveInstagram()
+                return
+            }
+            if (badge != null || quizOverlay != null) {
+                handler.postDelayed(this, OVERLAY_GUARD_INTERVAL_MS)
+            }
         }
     }
 
@@ -77,18 +92,9 @@ class ReelWatcherService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
         when (event.eventType) {
-            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
-                // a state change into another app means the user left Instagram
-                val pkg = event.packageName?.toString()
-                if (pkg != null && pkg != INSTAGRAM_PACKAGE && !isOwnOverlay(pkg)) {
-                    leaveInstagram()
-                } else {
-                    updateSurface()
-                }
-            }
+            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED,
             AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> updateSurface()
-            AccessibilityEvent.TYPE_VIEW_SCROLLED ->
-                if (recentlyInReels() && quizOverlay == null) onReelScrolled()
+            AccessibilityEvent.TYPE_VIEW_SCROLLED -> handleScroll(event)
         }
     }
 
@@ -104,10 +110,47 @@ class ReelWatcherService : AccessibilityService() {
         restoreMusic()
     }
 
-    private fun isOwnOverlay(pkg: String) = pkg == packageName
+    // --- Detection ---
+
+    private fun handleScroll(event: AccessibilityEvent) {
+        if (quizOverlay != null) return
+
+        val sourceId = event.source?.viewIdResourceName
+        if (sourceId != null) {
+            // identified scroll: count only if it's the reels pager itself
+            if (sourceId in REELS_PAGER_IDS) {
+                markReelsSeen()
+                onPagerScroll(event)
+            }
+            return
+        }
+
+        // unidentified scroll: accept only vertical ones while we're in reels
+        if (recentlyInReels() && isVertical(event)) {
+            debouncedCount()
+        }
+    }
+
+    private fun onPagerScroll(event: AccessibilityEvent) {
+        val index = event.fromIndex
+        if (index >= 0) {
+            // index change is one reel advancing, however it happened
+            if (index != lastReelIndex) {
+                lastReelIndex = index
+                debouncedCount()
+            }
+        } else {
+            debouncedCount()
+        }
+    }
+
+    private fun isVertical(event: AccessibilityEvent): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return true
+        return event.scrollDeltaY != 0 && event.scrollDeltaX == 0
+    }
 
     private fun recentlyInReels(): Boolean =
-        inReels && SystemClock.uptimeMillis() - lastReelsSeenMs < BADGE_LINGER_MS
+        inReels && SystemClock.uptimeMillis() - lastReelsSeenMs < BADGE_SHOW_MS + 2000L
 
     private fun updateSurface() {
         val now = SystemClock.uptimeMillis()
@@ -119,50 +162,63 @@ class ReelWatcherService : AccessibilityService() {
             root.findAccessibilityNodeInfosByViewId(id).isNotEmpty()
         }
         // an empty tree read is not proof we left, so only act on a real hit
-        if (!present) return
+        if (present) markReelsSeen()
+    }
 
+    private fun markReelsSeen() {
+        val now = SystemClock.uptimeMillis()
         val gap = now - lastReelsSeenMs
         lastReelsSeenMs = now
 
-        if (!inReels) {
+        if (gap > NEW_SITTING_GAP_MS) {
+            // been away a while, this is a fresh sitting and a reel is
+            // already playing, so it counts as the first one
+            reelCount = 1
+            reelsSinceQuiz = 1
+            lastReelIndex = -1
             inReels = true
-            if (gap > NEW_SITTING_GAP_MS) {
-                reelCount = 0
-                reelsSinceQuiz = 0
-            }
-            showBadge()
+            flashBadge()
+        } else if (!inReels) {
+            inReels = true
+            flashBadge()
         }
-        updateBadge()
-
-        handler.removeCallbacks(badgeHideCheck)
-        handler.postDelayed(badgeHideCheck, BADGE_LINGER_MS + 1000L)
     }
 
-    // User switched away from Instagram entirely. Tear everything down,
-    // including any question that was up.
+    // User left Instagram. Tear everything down, including any question.
     private fun leaveInstagram() {
         inReels = false
-        handler.removeCallbacks(badgeHideCheck)
+        handler.removeCallbacks(badgeHide)
         removeQuiz()
         removeBadge()
     }
 
-    private fun onReelScrolled() {
+    private fun debouncedCount() {
         val now = SystemClock.uptimeMillis()
-        val isNewSwipe = now - lastScrollMs > SCROLL_DEBOUNCE_MS
+        if (now - lastScrollMs < SCROLL_DEBOUNCE_MS) {
+            lastScrollMs = now
+            return
+        }
         lastScrollMs = now
-        if (!isNewSwipe) return
 
         reelCount++
         reelsSinceQuiz++
         bumpSessionReelCount()
-        updateBadge()
+        flashBadge()
 
-        if (reelsSinceQuiz >= REELS_PER_QUESTION) {
+        if (reelsSinceQuiz >= reelsPerQuestion()) {
             reelsSinceQuiz = 0
             showQuiz()
         }
     }
+
+    private fun reelsPerQuestion(): Int =
+        Prefs.get(this).getInt(Prefs.REELS_PER_QUESTION, Prefs.DEFAULT_REELS_PER_QUESTION)
+
+    private fun quizCategory(): QuizCategory = runCatching {
+        QuizCategory.valueOf(
+            Prefs.get(this).getString(Prefs.QUIZ_CATEGORY, Prefs.DEFAULT_QUIZ_CATEGORY)!!
+        )
+    }.getOrDefault(QuizCategory.MIXED)
 
     private fun bumpSessionReelCount() {
         val prefs = Prefs.get(this)
@@ -173,7 +229,20 @@ class ReelWatcherService : AccessibilityService() {
         }
     }
 
-    // --- Counter badge ---
+    // --- Counter badge, appears briefly on each reel then fades ---
+
+    private fun flashBadge() {
+        showBadge()
+        updateBadge()
+        handler.removeCallbacks(badgeHide)
+        handler.postDelayed(badgeHide, BADGE_SHOW_MS)
+        startOverlayGuard()
+    }
+
+    private fun startOverlayGuard() {
+        handler.removeCallbacks(overlayGuard)
+        handler.postDelayed(overlayGuard, OVERLAY_GUARD_INTERVAL_MS)
+    }
 
     private fun showBadge() {
         if (badge != null) return
@@ -277,14 +346,17 @@ class ReelWatcherService : AccessibilityService() {
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-            0, // focusable and touchable so the buttons work and the reel is blocked
+            // not focusable so Instagram keeps window focus and our guard can
+            // see the real foreground app; touch still works for the buttons
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             PixelFormat.OPAQUE
         ).apply { gravity = Gravity.CENTER }
 
-        loadQuestion(QuizBank.next())
+        loadQuestion(QuizBank.next(quizCategory()))
         windowManager?.addView(layout, params)
         quizOverlay = layout
         muteMusic()
+        startOverlayGuard()
     }
 
     private fun muteMusic() {
@@ -315,7 +387,7 @@ class ReelWatcherService : AccessibilityService() {
             removeQuiz()
         } else {
             // wrong answer costs another question
-            loadQuestion(QuizBank.next())
+            loadQuestion(QuizBank.next(quizCategory()))
             questionView?.text = "Not quite. ${question?.text}"
         }
     }
