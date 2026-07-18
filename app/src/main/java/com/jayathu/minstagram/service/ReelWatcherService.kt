@@ -55,7 +55,9 @@ class ReelWatcherService : AccessibilityService() {
     private var lastSurfaceCheckMs = 0L
     private var lastReelsSeenMs = 0L
     private var lastScrollMs = 0L
-    private var lastReelIndex = -1
+    // furthest reel position reached this sitting; only going past it counts,
+    // so scrolling back and forth over the same reels does not inflate
+    private var maxReelIndex = -1
     private var reelCount = 0
     private var reelsSinceQuiz = 0
 
@@ -133,14 +135,15 @@ class ReelWatcherService : AccessibilityService() {
 
     private fun onPagerScroll(event: AccessibilityEvent) {
         val index = event.fromIndex
-        if (index >= 0) {
-            // index change is one reel advancing, however it happened
-            if (index != lastReelIndex) {
-                lastReelIndex = index
-                debouncedCount()
-            }
-        } else {
+        if (index < 0) {
+            // no position info, fall back to counting debounced swipes
             debouncedCount()
+            return
+        }
+        // count only new ground; revisiting earlier reels does not
+        if (index > maxReelIndex) {
+            maxReelIndex = index
+            registerReel()
         }
     }
 
@@ -175,7 +178,7 @@ class ReelWatcherService : AccessibilityService() {
             // already playing, so it counts as the first one
             reelCount = 1
             reelsSinceQuiz = 1
-            lastReelIndex = -1
+            maxReelIndex = -1
             inReels = true
             flashBadge()
         } else if (!inReels) {
@@ -199,7 +202,10 @@ class ReelWatcherService : AccessibilityService() {
             return
         }
         lastScrollMs = now
+        registerReel()
+    }
 
+    private fun registerReel() {
         reelCount++
         reelsSinceQuiz++
         bumpSessionReelCount()
