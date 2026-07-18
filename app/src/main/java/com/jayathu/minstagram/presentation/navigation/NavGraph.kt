@@ -31,6 +31,7 @@ import com.jayathu.minstagram.data.Prefs
 import com.jayathu.minstagram.domain.model.SessionIntention
 import com.jayathu.minstagram.presentation.history.HistoryScreen
 import com.jayathu.minstagram.presentation.intent.IntentScreen
+import com.jayathu.minstagram.presentation.onboarding.OnboardingScreen
 import com.jayathu.minstagram.presentation.settings.SettingsScreen
 import com.jayathu.minstagram.presentation.intent.SessionConfig
 import com.jayathu.minstagram.presentation.summary.SessionSummaryScreen
@@ -46,7 +47,21 @@ fun MinstagramNavHost(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    NavHost(navController = navController, startDestination = "intent") {
+    val startDestination = if (Prefs.get(context).getBoolean(Prefs.ONBOARDING_DONE, false)) {
+        "intent"
+    } else {
+        "onboarding"
+    }
+
+    NavHost(navController = navController, startDestination = startDestination) {
+        composable("onboarding") {
+            OnboardingScreen(onDone = {
+                Prefs.get(context).edit().putBoolean(Prefs.ONBOARDING_DONE, true).apply()
+                navController.navigate("intent") {
+                    popUpTo(0) { inclusive = true }
+                }
+            })
+        }
         composable("intent") {
             // holds the session config so permission callbacks can resume the launch
             val pendingConfig = remember { mutableListOf<SessionConfig>() }
@@ -215,6 +230,7 @@ fun MinstagramNavHost(
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 val prefs = Prefs.get(context)
+                if (!prefs.getBoolean(Prefs.ONBOARDING_DONE, false)) return@LifecycleEventObserver
                 val intention = prefs.getString(Prefs.PENDING_SUMMARY_INTENTION, null)
                 if (intention != null) {
                     val seconds = prefs.getInt(Prefs.PENDING_SUMMARY_SECONDS, 0)

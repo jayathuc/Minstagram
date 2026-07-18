@@ -7,6 +7,7 @@ object Prefs {
     private const val NAME = "minstagram_prefs"
 
     const val AUTO_CLOSE = "auto_close_on_expiry"
+    const val ONBOARDING_DONE = "onboarding_done"
 
     // active session, lets the service recover if it gets restarted
     const val SESSION_ACTIVE = "session_active"

@@ -15,3 +15,6 @@
 local.properties
 /.idea/
 implementation_plan.md.resolved
+
+keystore.properties
+/keystore/
