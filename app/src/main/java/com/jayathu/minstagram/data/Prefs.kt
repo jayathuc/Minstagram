@@ -23,8 +23,14 @@ object Prefs {
     const val REELS_PER_QUESTION = "reels_per_question"
     const val QUIZ_CATEGORY = "quiz_category"
 
+    // pause before the session sheet unlocks, and snooze length
+    const val UNLOCK_DELAY_SECONDS = "unlock_delay_seconds"
+    const val SNOOZE_MINUTES = "snooze_minutes"
+
     const val DEFAULT_REELS_PER_QUESTION = 3
     const val DEFAULT_QUIZ_CATEGORY = "MIXED"
+    const val DEFAULT_UNLOCK_DELAY_SECONDS = 5
+    const val DEFAULT_SNOOZE_MINUTES = 30
 
     // set when a session ends while the user is in another app,
     // shown next time they open Minstagram

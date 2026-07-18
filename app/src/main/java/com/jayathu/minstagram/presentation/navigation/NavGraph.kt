@@ -39,8 +39,6 @@ import com.jayathu.minstagram.service.UsageMonitorService
 import com.jayathu.minstagram.util.hasUsageAccess
 import com.jayathu.minstagram.util.launchInstagram
 
-private const val SNOOZE_MINUTES = 30
-
 @Composable
 fun MinstagramNavHost(
     navController: NavHostController = rememberNavController()
@@ -90,11 +88,10 @@ fun MinstagramNavHost(
             }
 
             fun snooze() {
-                Prefs.get(context).edit()
-                    .putLong(
-                        Prefs.SNOOZE_UNTIL_MS,
-                        System.currentTimeMillis() + SNOOZE_MINUTES * 60_000L
-                    )
+                val prefs = Prefs.get(context)
+                val minutes = prefs.getInt(Prefs.SNOOZE_MINUTES, Prefs.DEFAULT_SNOOZE_MINUTES)
+                prefs.edit()
+                    .putLong(Prefs.SNOOZE_UNTIL_MS, System.currentTimeMillis() + minutes * 60_000L)
                     .apply()
                 launchInstagram(context)
             }

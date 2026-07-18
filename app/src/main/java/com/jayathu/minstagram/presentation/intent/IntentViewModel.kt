@@ -6,7 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.jayathu.minstagram.domain.model.SessionIntention
+import com.jayathu.minstagram.data.local.SessionDao
 import com.jayathu.minstagram.util.hasUsageAccess
 import com.jayathu.minstagram.util.instagramUsageMs
 import com.jayathu.minstagram.util.sevenDaysAgoMs
@@ -20,14 +20,11 @@ import javax.inject.Inject
 
 @HiltViewModel
 class IntentViewModel @Inject constructor(
-    @ApplicationContext private val appContext: Context
+    @ApplicationContext private val appContext: Context,
+    sessionDao: SessionDao
 ) : ViewModel() {
 
-    var selectedIntention by mutableStateOf<SessionIntention?>(null)
-        private set
-
-    var selectedTimeLimitMinutes by mutableStateOf(5)
-        private set
+    val sessionsToday = sessionDao.countSince(startOfTodayMs())
 
     // real Instagram screen time, negative means unknown
     var usageTodayMs by mutableStateOf(-1L)
@@ -50,13 +47,5 @@ class IntentViewModel @Inject constructor(
             usageTodayMs = today
             usageWeekMs = week
         }
-    }
-
-    fun selectIntention(intention: SessionIntention) {
-        selectedIntention = intention
-    }
-
-    fun selectTimeLimit(minutes: Int) {
-        selectedTimeLimitMinutes = minutes
     }
 }
