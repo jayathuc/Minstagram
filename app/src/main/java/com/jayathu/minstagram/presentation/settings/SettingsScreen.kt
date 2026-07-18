@@ -42,10 +42,16 @@ import kotlinx.coroutines.launch
 
 private const val HOLD_MS = 5000L
 
+// update once the policy is hosted publicly
+private const val PRIVACY_URL = "https://github.com/jayathuc/minstagram/blob/main/PRIVACY.md"
+
 // Asymmetric friction: tightening a protection applies on tap,
 // loosening one needs a five second hold.
 @Composable
-fun SettingsScreen(onBack: () -> Unit) {
+fun SettingsScreen(
+    onBack: () -> Unit,
+    onShowSupport: () -> Unit = {}
+) {
     val context = LocalContext.current
     val prefs = remember { Prefs.get(context) }
 
@@ -193,9 +199,58 @@ fun SettingsScreen(onBack: () -> Unit) {
             )
 
             Spacer(modifier = Modifier.height(32.dp))
+
+            Text(
+                text = "About",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Text(
+                text = "Minstagram ${appVersion(context)}. Free. No ads, no tracking, " +
+                    "nothing leaves your phone.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Row {
+                TextButton(onClick = onShowSupport) {
+                    Text("Support the project")
+                }
+                TextButton(onClick = {
+                    context.startActivity(
+                        android.content.Intent(
+                            android.content.Intent.ACTION_VIEW,
+                            android.net.Uri.parse(PRIVACY_URL)
+                        )
+                    )
+                }) {
+                    Text("Privacy")
+                }
+            }
+            TextButton(onClick = {
+                val share = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(
+                        android.content.Intent.EXTRA_TEXT,
+                        "I use Minstagram to keep Instagram from eating my time. " +
+                            "It asks why you're opening it, keeps a timer, and puts " +
+                            "a question between Reels."
+                    )
+                }
+                context.startActivity(
+                    android.content.Intent.createChooser(share, "Share Minstagram")
+                )
+            }) {
+                Text("Tell a friend")
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
         }
     }
 }
+
+private fun appVersion(context: android.content.Context): String = runCatching {
+    context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: ""
+}.getOrDefault("")
 
 @Composable
 private fun SettingSection(

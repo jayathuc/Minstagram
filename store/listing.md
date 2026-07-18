@@ -64,6 +64,23 @@ The app's core function (catching direct Instagram opens) requires a
 background monitor that OEM battery managers otherwise kill. Requested
 optionally during onboarding.
 
+## Tip jar setup (Play Console)
+
+1. Set up the merchant account in the console (Sri Lanka is supported,
+   payouts in USD).
+2. Monetize > Products > In-app products: create three products with the
+   exact ids `tip_small`, `tip_medium`, `tip_large`. Suggested names and
+   prices: "Small tip" 1.99 USD, "Nice tip" 4.99 USD, "Generous tip"
+   9.99 USD. Activate all three.
+3. The Support screen sorts by price and shows the console names, so
+   name them what buyers should see.
+4. Tips only work in builds installed through Play. Add your account as a
+   license tester and verify the flow on the internal testing track.
+5. Donation links (Patreon, Ko-fi, GitHub Sponsors) go on the project
+   web page and README, not inside the Play build. For payouts from
+   Sri Lanka, Patreon via Payoneer is the reliable rail; verify before
+   publishing any link.
+
 ## Release checklist
 
 - [ ] Decide final name and applicationId

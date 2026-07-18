@@ -90,6 +90,9 @@ dependencies {
     implementation(libs.hilt.navigation.compose)
 
 
+    // Billing
+    implementation(libs.billing.ktx)
+
     // Room
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
