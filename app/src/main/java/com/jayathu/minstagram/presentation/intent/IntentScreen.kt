@@ -174,6 +174,17 @@ fun IntentScreen(
                 sheetIntention = null
                 onSnooze()
             },
+            onLeave = {
+                sheetIntention = null
+                // bring the launcher to the front. We don't finish this
+                // activity, since that would resume whatever app was behind
+                // us (often Instagram) instead of the home screen.
+                val home = android.content.Intent(android.content.Intent.ACTION_MAIN).apply {
+                    addCategory(android.content.Intent.CATEGORY_HOME)
+                    flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                context.startActivity(home)
+            },
             onDismiss = { sheetIntention = null }
         )
     }

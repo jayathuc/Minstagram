@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -19,7 +21,9 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -54,6 +58,7 @@ fun SessionSheet(
     snoozeMinutes: Int,
     onBegin: (SessionConfig) -> Unit,
     onSnooze: () -> Unit,
+    onLeave: () -> Unit,
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
@@ -80,10 +85,13 @@ fun SessionSheet(
         mutableStateOf(prefs.getBoolean(Prefs.AUTO_CLOSE, false))
     }
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    // open fully so the Begin and leave buttons are visible without dragging
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp)
                 .padding(bottom = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -103,23 +111,17 @@ fun SessionSheet(
                 )
             }
 
-            if (intention == SessionIntention.WATCH_REELS && !isReelWatcherEnabled(context)) {
-                Spacer(modifier = Modifier.height(8.dp))
-                TextButton(onClick = {
-                    context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-                }) {
-                    Text("Turn on reel questions in Accessibility settings")
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
             if (locked) {
+                // The decision moment. Keep it short so the way out is on
+                // screen with no scrolling, and make leaving the one obvious
+                // button. Session options appear once the timer ends.
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(
                             progress = { remaining / totalDelay.toFloat() },
-                            modifier = Modifier.size(44.dp)
+                            modifier = Modifier.size(48.dp)
                         )
                         Text(
                             text = "$remaining",
@@ -127,14 +129,50 @@ fun SessionSheet(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                     }
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(modifier = Modifier.width(14.dp))
                     Text(
-                        text = "A moment to decide.",
+                        text = "A moment to decide. No rush to stay.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Spacer(modifier = Modifier.height(16.dp))
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Button(
+                    onClick = onLeave,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                ) {
+                    Text(
+                        text = "I've got better things to do",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = "Begin unlocks when the timer ends.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+                TextButton(onClick = onDismiss) {
+                    Text("Back")
+                }
+                return@Column
+            }
+
+            if (intention == SessionIntention.WATCH_REELS && !isReelWatcherEnabled(context)) {
+                TextButton(onClick = {
+                    context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                }) {
+                    Text("Turn on reel questions in Accessibility settings")
+                }
+                Spacer(modifier = Modifier.height(8.dp))
             }
 
             listOf(listOf(1, 5), listOf(10, 15)).forEach { rowMinutes ->
@@ -145,7 +183,6 @@ fun SessionSheet(
                     rowMinutes.forEach { minutes ->
                         FilterChip(
                             selected = timeLimit == minutes,
-                            enabled = !locked,
                             onClick = { timeLimit = minutes },
                             modifier = Modifier
                                 .weight(1f)
@@ -180,7 +217,6 @@ fun SessionSheet(
                 )
                 Switch(
                     checked = autoClose,
-                    enabled = !locked,
                     onCheckedChange = {
                         autoClose = it
                         prefs.edit().putBoolean(Prefs.AUTO_CLOSE, it).apply()
@@ -192,7 +228,6 @@ fun SessionSheet(
 
             Button(
                 onClick = { onBegin(SessionConfig(intention, timeLimit, intercepted)) },
-                enabled = !locked,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp)
@@ -203,15 +238,27 @@ fun SessionSheet(
                 )
             }
 
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Still one tap out, even after the wait.
+            OutlinedButton(
+                onClick = onLeave,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp)
+            ) {
+                Text("I've got better things to do")
+            }
+
             if (intercepted) {
                 Spacer(modifier = Modifier.height(4.dp))
-                TextButton(onClick = onSnooze, enabled = !locked) {
-                    Text("Not now, snooze for $snoozeMinutes minutes")
+                TextButton(onClick = onSnooze) {
+                    Text("Open Instagram anyway, snooze $snoozeMinutes min")
                 }
             }
 
             TextButton(onClick = onDismiss) {
-                Text("Never mind")
+                Text("Back")
             }
         }
     }
