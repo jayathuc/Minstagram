@@ -26,6 +26,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,6 +36,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -45,6 +49,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.jayathu.minstagram.data.Prefs
 import com.jayathu.minstagram.domain.model.SessionIntention
 import com.jayathu.minstagram.util.formatHoursMinutes
+import com.jayathu.minstagram.util.leaveToChosenApp
 
 data class SessionConfig(
     val intention: SessionIntention,
@@ -64,6 +69,17 @@ fun IntentScreen(
     val context = LocalContext.current
     val sessionsToday by viewModel.sessionsToday.collectAsState(initial = 0)
     var sheetIntention by rememberSaveable { mutableStateOf<SessionIntention?>(null) }
+
+    // refresh the usage figures each time we come back, so they reflect the
+    // latest screen time and re-anchor to today's midnight past a day rollover
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) viewModel.loadUsage()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -176,14 +192,10 @@ fun IntentScreen(
             },
             onLeave = {
                 sheetIntention = null
-                // bring the launcher to the front. We don't finish this
-                // activity, since that would resume whatever app was behind
-                // us (often Instagram) instead of the home screen.
-                val home = android.content.Intent(android.content.Intent.ACTION_MAIN).apply {
-                    addCategory(android.content.Intent.CATEGORY_HOME)
-                    flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
-                }
-                context.startActivity(home)
+                // off to the user's chosen place (home screen by default). We
+                // don't finish this activity, since that would resume whatever
+                // app was behind us (often Instagram) instead.
+                leaveToChosenApp(context)
             },
             onDismiss = { sheetIntention = null }
         )

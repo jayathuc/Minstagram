@@ -1,8 +1,8 @@
 package com.jayathu.minstagram
 
 import com.jayathu.minstagram.domain.QuizBank
-import com.jayathu.minstagram.domain.QuizCategory
 import com.jayathu.minstagram.domain.QuizQuestion
+import com.jayathu.minstagram.domain.QuizTopic
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -17,35 +17,66 @@ class QuizBankTest {
     }
 
     @Test
-    fun `generated questions are well formed`() {
-        repeat(1000) { assertWellFormed(QuizBank.next(QuizCategory.MATH)) }
+    fun `generated math questions are well formed`() {
+        repeat(1000) { assertWellFormed(QuizBank.next(setOf(QuizTopic.MATH))) }
     }
 
     @Test
-    fun `mixed questions are well formed`() {
-        repeat(1000) { assertWellFormed(QuizBank.next(QuizCategory.MIXED)) }
+    fun `all topics enabled produces well formed questions`() {
+        repeat(2000) { assertWellFormed(QuizBank.next()) }
     }
 
     @Test
-    fun `every general question is well formed`() {
-        QuizBank.general.forEach { assertWellFormed(it) }
+    fun `an empty topic set falls back to all topics`() {
+        repeat(500) { assertWellFormed(QuizBank.next(emptySet())) }
     }
 
     @Test
-    fun `general pool has no duplicate questions`() {
-        val texts = QuizBank.general.map { it.text }
+    fun `every fixed question is well formed`() {
+        QuizBank.allFixed.forEach { assertWellFormed(it) }
+    }
+
+    @Test
+    fun `each single topic yields well formed questions`() {
+        QuizTopic.entries.forEach { topic ->
+            repeat(200) { assertWellFormed(QuizBank.next(setOf(topic))) }
+        }
+    }
+
+    @Test
+    fun `fixed pool has no duplicate questions`() {
+        val texts = QuizBank.allFixed.map { it.text }
         assertEquals(texts.size, texts.distinct().size)
     }
 
     @Test
-    fun `general pool is large`() {
-        assertTrue("pool should be sizable", QuizBank.general.size >= 100)
+    fun `fixed pool is large`() {
+        assertTrue("pool should be sizable, was ${QuizBank.allFixed.size}", QuizBank.allFixed.size >= 200)
+    }
+
+    @Test
+    fun `facts when present are non blank`() {
+        QuizBank.allFixed.forEach {
+            val fact = it.fact
+            if (fact != null) assertTrue("blank fact for: ${it.text}", fact.isNotBlank())
+        }
+    }
+
+    @Test
+    fun `many questions carry a fact`() {
+        val withFact = QuizBank.allFixed.count { it.fact != null }
+        assertTrue("expected plenty of facts, was $withFact", withFact >= 100)
+    }
+
+    @Test
+    fun `affirmation is never blank`() {
+        repeat(50) { assertTrue(QuizBank.affirmation().isNotBlank()) }
     }
 
     @Test
     fun `arithmetic questions have the right answer`() {
         repeat(2000) {
-            val q = QuizBank.next(QuizCategory.MATH)
+            val q = QuizBank.next(setOf(QuizTopic.MATH))
             val answer = q.options[q.answerIndex].toIntOrNull() ?: return@repeat
             val text = q.text.trim().removeSuffix("= ?").removeSuffix("=?").trim()
             val expected = when {

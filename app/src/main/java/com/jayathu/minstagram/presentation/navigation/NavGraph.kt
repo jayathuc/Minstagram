@@ -48,6 +48,10 @@ fun MinstagramNavHost(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
+    // true when the monitor caught a direct Instagram open. Hoisted here so an
+    // intercept can route home from any screen, not just when the gate is open.
+    var intercepted by rememberSaveable { mutableStateOf(false) }
+
     val startDestination = if (Prefs.get(context).getBoolean(Prefs.ONBOARDING_DONE, false)) {
         "intent"
     } else {
@@ -67,23 +71,6 @@ fun MinstagramNavHost(
             // holds the session config so permission callbacks can resume the launch
             val pendingConfig = remember { mutableListOf<SessionConfig>() }
 
-            // true when the monitor caught a direct Instagram open;
-            // saveable so it survives a detour to the history screen
-            var intercepted by rememberSaveable { mutableStateOf(false) }
-            DisposableEffect(lifecycleOwner) {
-                val observer = LifecycleEventObserver { _, event ->
-                    if (event == Lifecycle.Event.ON_RESUME) {
-                        val prefs = Prefs.get(context)
-                        if (prefs.getBoolean(Prefs.INTERCEPTED_PROMPT, false)) {
-                            prefs.edit().remove(Prefs.INTERCEPTED_PROMPT).apply()
-                            intercepted = true
-                        }
-                    }
-                }
-                lifecycleOwner.lifecycle.addObserver(observer)
-                onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-            }
-
             fun startUsageMonitor() {
                 if (hasUsageAccess(context)) {
                     context.startForegroundService(
@@ -93,6 +80,7 @@ fun MinstagramNavHost(
             }
 
             fun launchSession(config: SessionConfig) {
+                intercepted = false
                 val serviceIntent = Intent(context, SessionService::class.java).apply {
                     putExtra(SessionService.EXTRA_INTENTION, config.intention.name)
                     putExtra(SessionService.EXTRA_TIME_LIMIT_SECONDS, config.timeLimitMinutes * 60)
@@ -104,6 +92,7 @@ fun MinstagramNavHost(
             }
 
             fun snooze() {
+                intercepted = false
                 val prefs = Prefs.get(context)
                 val minutes = prefs.getInt(Prefs.SNOOZE_MINUTES, Prefs.DEFAULT_SNOOZE_MINUTES)
                 prefs.edit()
@@ -230,14 +219,15 @@ fun MinstagramNavHost(
         }
     }
 
-    // a session that ended while we were in the background leaves its summary
-    // in prefs; check whenever the app comes to the foreground. This runs after
-    // NavHost so the graph is ready when we navigate.
+    // Checked whenever the app comes to the foreground. This runs after NavHost
+    // so the graph is ready when we navigate.
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 val prefs = Prefs.get(context)
                 if (!prefs.getBoolean(Prefs.ONBOARDING_DONE, false)) return@LifecycleEventObserver
+
+                // a session that ended in the background left its summary in prefs
                 val intention = prefs.getString(Prefs.PENDING_SUMMARY_INTENTION, null)
                 if (intention != null) {
                     val seconds = prefs.getInt(Prefs.PENDING_SUMMARY_SECONDS, 0)
@@ -245,7 +235,19 @@ fun MinstagramNavHost(
                         .remove(Prefs.PENDING_SUMMARY_INTENTION)
                         .remove(Prefs.PENDING_SUMMARY_SECONDS)
                         .apply()
+                    intercepted = false
                     navController.navigate("summary/$intention/$seconds") {
+                        popUpTo(0) { inclusive = true }
+                    }
+                    return@LifecycleEventObserver
+                }
+
+                // the monitor caught a direct Instagram open. Route back to the
+                // gate no matter what screen we were last on (settings, history).
+                if (prefs.getBoolean(Prefs.INTERCEPTED_PROMPT, false)) {
+                    prefs.edit().remove(Prefs.INTERCEPTED_PROMPT).apply()
+                    intercepted = true
+                    navController.navigate("intent") {
                         popUpTo(0) { inclusive = true }
                     }
                 }

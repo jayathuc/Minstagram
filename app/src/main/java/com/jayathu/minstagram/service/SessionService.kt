@@ -230,6 +230,9 @@ class SessionService : Service() {
     // --- Timer expiry ---
 
     private fun onTimerExpired() {
+        // a reel question might be up covering the whole screen; clear it so
+        // the summary or the time's-up screen isn't hidden behind it
+        ReelWatcherService.dismissActiveQuiz()
         notify(buildExpiredNotification())
         if (isAutoCloseEnabled()) {
             endSession(EndReason.COMPLETED)

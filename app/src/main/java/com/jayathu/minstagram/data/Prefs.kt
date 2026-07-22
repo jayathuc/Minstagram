@@ -22,14 +22,17 @@ object Prefs {
 
     // user settings for reel questions
     const val REELS_PER_QUESTION = "reels_per_question"
-    const val QUIZ_CATEGORY = "quiz_category"
+    // set of enabled QuizTopic names; missing means all topics on
+    const val QUIZ_TOPICS = "quiz_topics"
 
     // pause before the session sheet unlocks, and snooze length
     const val UNLOCK_DELAY_SECONDS = "unlock_delay_seconds"
     const val SNOOZE_MINUTES = "snooze_minutes"
 
+    // package the "better things to do" exit opens; unset means the home screen
+    const val EXIT_TARGET_PACKAGE = "exit_target_package"
+
     const val DEFAULT_REELS_PER_QUESTION = 3
-    const val DEFAULT_QUIZ_CATEGORY = "MIXED"
     const val DEFAULT_UNLOCK_DELAY_SECONDS = 5
     const val DEFAULT_SNOOZE_MINUTES = 30
 
