@@ -4,7 +4,9 @@ Minstagram is a digital wellbeing app that puts a pause between you and Instagra
 
 ## What we collect
 
-Nothing. Minstagram has no account system, no analytics, no crash reporting, and no servers. The app never connects to the internet on its own.
+Nothing. Minstagram has no account system, no analytics, no crash reporting, and no servers of its own.
+
+The only time the app uses the internet is the optional tip jar, which goes through Google Play Billing. If you choose to leave a tip, Google Play handles the payment. We never see your payment details, and we collect nothing from it. If you never open the tip jar, the app makes no network connections at all.
 
 ## What stays on your phone
 
@@ -14,7 +16,7 @@ Nothing. Minstagram has no account system, no analytics, no crash reporting, and
 
 ## What leaves your phone
 
-Nothing does.
+Nothing does, apart from an optional tip you send through Google Play Billing, which carries no personal data from the app.
 
 ## Deleting your data
 

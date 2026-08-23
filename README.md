@@ -58,3 +58,7 @@ Everything runs on your device. No accounts, no servers, no analytics.
 ## Status
 
 Working end to end: intention gate, pause-aware session timer, overlay banner, expiry overlay, direct open interception with snooze, the Reels quiz gate with a large question bank, session history with a usage chart, an easy exit, and a tip jar. Survives reboots.
+
+## License
+
+Apache License 2.0. See [LICENSE](LICENSE).
